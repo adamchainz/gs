@@ -1,43 +1,54 @@
 #!/usr/bin/env python
+import random
 import sys
 from copy import deepcopy
 
-CUBE_SIZE = 6
-NUM_PIECES = 54
+CUBE_SIZE = 4
+NUM_PIECES = 16
 
 
 def main():
-    positions = list(all_positions(CUBE_SIZE))
+    # print(sum(1 for p in all_positions(6) if (2, 2, 2) in p))
+    # Print all positions in 4 sided cube passing through (1, 1, 1)
+    # for position in all_positions(4):
+    #     if (1, 1, 1) in position:
+    #         cube = cube_with_position_taken(create_cube(4), position, 1)
+    #         print_cube(cube)
+
+    positions = all_positions(CUBE_SIZE)
+    random.shuffle(positions)
     cube = create_cube(CUBE_SIZE)
     sys.setrecursionlimit(len(positions) * 2)
-    solved_cube = next(find_solutions(cube, positions, NUM_PIECES))
+    solved_cube = next(find_solutions(cube, positions, 13))
     print_cube(solved_cube)
 
 
 def find_solutions(cube, positions, positions_to_pick):
-    if positions_to_pick > len(positions):
-        return
+    # Try skipping the head position
+    if len(positions) > positions_to_pick:
+        yield from find_solutions(cube, positions[1:], positions_to_pick)
 
-    current_position = positions[0]
-    remaining_positions = positions[1:]
-    if all(cube[a][b][c] is None for a, b, c in current_position):
-        new_cube = deepcopy(cube)
-        for a, b, c in current_position:
-            new_cube[a][b][c] = positions_to_pick
-        new_positions_to_pick = positions_to_pick - 1
-        if new_positions_to_pick == 0:
-            yield new_cube
-        else:
-            yield from find_solutions(new_cube, remaining_positions, new_positions_to_pick)
-    yield from find_solutions(cube, remaining_positions, positions_to_pick)
+    # Try taking the head position
+    head_position = positions[0]
+    new_cube = cube_with_position_taken(cube, head_position, label=positions_to_pick)
+    if positions_to_pick == 1:
+        yield new_cube
+    else:
+        new_positions = [
+            p for p in positions[1:]
+            if all(new_cube[a][b][c] is None for a, b, c in p)
+        ]
+        if len(new_positions) >= positions_to_pick:
+            yield from find_solutions(new_cube, new_positions, positions_to_pick - 1)
 
 
 def all_positions(cube_size):
+    positions = set()
     for x in range(cube_size):
         for y in range(cube_size):
             for z in range(cube_size):
-                for position in positions_at_point(cube_size, x, y, z):
-                    yield position
+                positions.update(positions_at_point(cube_size, x, y, z))
+    return sorted(positions)
 
 
 def positions_at_point(cube_size, x, y, z):
@@ -48,91 +59,38 @@ def positions_at_point(cube_size, x, y, z):
     # We trim the directions for the edges though down to three though, since
     # e.g. negative X is represented by positive X with a different starting
     # position inside the bounds of the cube.
-    positions = [
-        (
-            (x, y, z),
-            (x + 1, y, z),
-            (x + 2, y, z),
-            (x + 1, y + 1, z),
-        ),
-        (
-            (x, y, z),
-            (x + 1, y, z),
-            (x + 2, y, z),
-            (x + 1, y - 1, z),
-        ),
-        (
-            (x, y, z),
-            (x + 1, y, z),
-            (x + 2, y, z),
-            (x + 1, y, z + 1),
-        ),
-        (
-            (x, y, z),
-            (x + 1, y, z),
-            (x + 2, y, z),
-            (x + 1, y, z - 1),
-        ),
-
-        (
-            (x, y, z),
-            (x, y + 1, z),
-            (x, y + 2, z),
-            (x + 1, y + 1, z),
-        ),
-        (
-            (x, y, z),
-            (x, y + 1, z),
-            (x, y + 2, z),
-            (x - 1, y + 1, z),
-        ),
-        (
-            (x, y, z),
-            (x, y + 1, z),
-            (x, y + 2, z),
-            (x, y + 1, z + 1),
-        ),
-        (
-            (x, y, z),
-            (x, y + 1, z),
-            (x, y + 2, z),
-            (x, y + 1, z + 2),
-        ),
-
-        (
-            (x, y, z),
-            (x, y, z + 1),
-            (x, y, z + 2),
-            (x + 1, y, z + 1),
-        ),
-        (
-            (x, y, z),
-            (x, y, z + 1),
-            (x, y, z + 2),
-            (x - 1, y, z + 1),
-        ),
-        (
-            (x, y, z),
-            (x, y, z + 1),
-            (x, y, z + 2),
-            (x, y + 1, z + 1),
-        ),
-        (
-            (x, y, z),
-            (x, y, z + 1),
-            (x, y, z + 2),
-            (x, y - 1, z + 1),
-        ),
-    ]
-
-    for position in positions:
-        if all(
-            0 <= a < CUBE_SIZE
-            and 0 <= b < CUBE_SIZE
-            and 0 <= c < CUBE_SIZE
-            for a, b, c in position
-        ):
-            yield tuple(sorted(position))
+    for axis in ('x', 'y', 'z'):
+        for direction in (1, -1):
+            for stick_axis in {'x', 'y', 'z'} - {axis}:
+                for stick_direction in (1, -1):
+                    # Square 1 : always target point
+                    square_1 = (x, y, z)
+                    # Square 2: one step along axis
+                    square_2 = (
+                        x + (direction if axis == 'x' else 0),
+                        y + (direction if axis == 'y' else 0),
+                        z + (direction if axis == 'z' else 0),
+                    )
+                    # Square 3: two steps along axis
+                    square_3 = (
+                        x + (2 * direction if axis == 'x' else 0),
+                        y + (2 * direction if axis == 'y' else 0),
+                        z + (2 * direction if axis == 'z' else 0),
+                    )
+                    # Square 4: 'stick', offset from square 2
+                    square_4 = (
+                        square_2[0] + (stick_direction if stick_axis == 'x' else 0),
+                        square_2[1] + (stick_direction if stick_axis == 'y' else 0),
+                        square_2[2] + (stick_direction if stick_axis == 'z' else 0),
+                    )
+                    position = tuple(sorted([square_1, square_2, square_3, square_4]))
+                    if all(
+                        0 <= a < CUBE_SIZE
+                        and 0 <= b < CUBE_SIZE
+                        and 0 <= c < CUBE_SIZE
+                        for a, b, c in position
+                    ):
+                        yield tuple(sorted(position))
 
 
 def test_all_positions_unique():
@@ -183,6 +141,13 @@ def test_create_cube_2():
             [None, None],
         ],
     ]
+
+
+def cube_with_position_taken(cube, position, label):
+    new_cube = deepcopy(cube)
+    for a, b, c in position:
+        new_cube[a][b][c] = label
+    return new_cube
 
 
 def print_cube(cube):
