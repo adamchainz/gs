@@ -85,12 +85,16 @@ def positions_at_point(cube_size, x, y, z):
                     )
                     position = tuple(sorted([square_1, square_2, square_3, square_4]))
                     if all(
-                        0 <= a < CUBE_SIZE
-                        and 0 <= b < CUBE_SIZE
-                        and 0 <= c < CUBE_SIZE
+                        0 <= a < cube_size
+                        and 0 <= b < cube_size
+                        and 0 <= c < cube_size
                         for a, b, c in position
                     ):
                         yield tuple(sorted(position))
+
+
+def test_all_positions_unfeasible_cube():
+    assert all_positions(2) == []
 
 
 def test_all_positions_unique():
