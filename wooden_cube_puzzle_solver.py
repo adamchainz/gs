@@ -1,10 +1,9 @@
 #!/usr/bin/env python
-import random
 import sys
 from copy import deepcopy
 
-CUBE_SIZE = 4
-NUM_PIECES = 16
+CUBE_SIZE = 6
+NUM_PIECES = 54
 
 
 def main():
@@ -16,11 +15,70 @@ def main():
     #         print_cube(cube)
 
     positions = all_positions(CUBE_SIZE)
-    random.shuffle(positions)
     cube = create_cube(CUBE_SIZE)
     sys.setrecursionlimit(len(positions) * 2)
-    solved_cube = next(find_solutions(cube, positions, 13))
+    solved_cube = next(find_solutions_newer(cube, positions, NUM_PIECES))
+    # solved_cube = next(find_solutions_new(cube, CUBE_SIZE, positions, 50))
     print_cube(solved_cube)
+
+
+def find_solutions_newer(cube, positions, positions_to_pick):
+    head_position = positions[0]
+
+    shared_positions = []
+    non_shared_positions = []
+    for position in positions:
+        if any(c in head_position for c in position):
+            shared_positions.append(position)
+        else:
+            non_shared_positions.append(position)
+
+    for position in shared_positions:
+        new_cube = cube_with_position_taken(cube, position, label=positions_to_pick)
+        if positions_to_pick == 1:
+            yield new_cube
+        else:
+            available = [p for p in non_shared_positions if all(new_cube[a][b][c] is None for a, b, c in p)]
+            if available:
+                yield from find_solutions_newer(
+                    new_cube,
+                    available,
+                    positions_to_pick - 1,
+                )
+
+
+def find_solutions_new(cube, cube_size, positions, positions_to_pick):
+    if positions_to_pick == 0:
+        yield cube
+        return
+
+    for x in range(cube_size):
+        for y in range(cube_size):
+            for z in range(cube_size):
+                if cube[x][y][z] is not None:
+                    continue
+
+                point = (x, y, z)
+                positions_touching_point = []
+                positions_not_touching_point = []
+                for position in positions:
+                    if point in position:
+                        positions_touching_point.append(position)
+                    else:
+                        positions_not_touching_point.append(position)
+
+                for position in positions_touching_point:
+                    new_cube = cube_with_position_taken(cube, position, label=positions_to_pick)
+                    allowed_positions = [
+                        p for p in positions_not_touching_point
+                        if all(new_cube[a][b][c] is None for a, b, c in p)
+                    ]
+                    yield from find_solutions_new(
+                        new_cube,
+                        cube_size,
+                        allowed_positions,
+                        positions_to_pick - 1,
+                    )
 
 
 def find_solutions(cube, positions, positions_to_pick):
