@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import random
+import sys
 from copy import deepcopy
 
 CUBE_SIZE = 6
@@ -7,59 +7,47 @@ NUM_PIECES = 54
 
 
 def main():
+    positions = list(all_positions(CUBE_SIZE))
     cube = create_cube(CUBE_SIZE)
-    solved_cube = next(find_solutions(cube, 1))
+    sys.setrecursionlimit(len(positions) * 2)
+    solved_cube = next(find_solutions(cube, positions, NUM_PIECES))
     print_cube(solved_cube)
 
 
-def find_solutions(cube, current_piece):
-    if current_piece < NUM_PIECES - 2:
-        print(current_piece)
-    for x in range(CUBE_SIZE):
-        for y in range(CUBE_SIZE):
-            for z in range(CUBE_SIZE):
-                for position in get_piece_positions(cube, x, y, z):
-                    new_cube = deepcopy(cube)
-                    for a, b, c in position:
-                        new_cube[a][b][c] = current_piece
-                    if current_piece == NUM_PIECES:
-                        yield new_cube
-                    else:
-                        yield from find_solutions(new_cube, current_piece + 1)
+def find_solutions(cube, positions, positions_to_pick):
+    if positions_to_pick > len(positions):
+        return
+
+    current_position = positions[0]
+    remaining_positions = positions[1:]
+    if all(cube[a][b][c] is None for a, b, c in current_position):
+        new_cube = deepcopy(cube)
+        for a, b, c in current_position:
+            new_cube[a][b][c] = positions_to_pick
+        new_positions_to_pick = positions_to_pick - 1
+        if new_positions_to_pick == 0:
+            yield new_cube
+        else:
+            yield from find_solutions(new_cube, remaining_positions, new_positions_to_pick)
+    yield from find_solutions(cube, remaining_positions, positions_to_pick)
 
 
-def create_cube(size):
-    return [
-        [
-            [None for x in range(size)]
-            for y in range(size)
-        ]
-        for z in range(size)
-    ]
+def all_positions(cube_size):
+    for x in range(cube_size):
+        for y in range(cube_size):
+            for z in range(cube_size):
+                for position in positions_at_point(cube_size, x, y, z):
+                    yield position
 
 
-def test_create_cube_1():
-    assert create_cube(1) == [[[None]]]
-
-
-def test_create_cube_2():
-    assert create_cube(2) == [
-        [
-            [None, None],
-            [None, None],
-        ],
-        [
-            [None, None],
-            [None, None],
-        ],
-    ]
-
-
-def get_piece_positions(cube, x, y, z):
+def positions_at_point(cube_size, x, y, z):
     # Output all the ways of putting a piece in at virtual co-ordinates x, y, z
     # The piece might be oriented with its long edge pointing into any of the 6
     # directions representing the faces of a cube. Then it might be rotated any
-    # of 4 ways for its "stick" to point
+    # of 4 ways for its "stick" to point.
+    # We trim the directions for the edges though down to three though, since
+    # e.g. negative X is represented by positive X with a different starting
+    # position inside the bounds of the cube.
     positions = [
         (
             (x, y, z),
@@ -142,10 +130,59 @@ def get_piece_positions(cube, x, y, z):
             0 <= a < CUBE_SIZE
             and 0 <= b < CUBE_SIZE
             and 0 <= c < CUBE_SIZE
-            and cube[a][b][c] is None
             for a, b, c in position
         ):
-            yield position
+            yield tuple(sorted(position))
+
+
+def test_all_positions_unique():
+    positions = list(all_positions(6))
+    assert len(positions) == len(set(positions))
+
+
+def test_all_positions_bounds():
+    positions = set(all_positions(6))
+    first_position = (
+        (0, 0, 0),
+        (0, 0, 1),
+        (0, 0, 2),
+        (0, 1, 1),
+    )
+    assert first_position in positions
+    last_position = (
+        (5, 4, 4),
+        (5, 5, 3),
+        (5, 5, 4),
+        (5, 5, 5),
+    )
+    assert last_position in positions
+
+
+def create_cube(size):
+    return [
+        [
+            [None for x in range(size)]
+            for y in range(size)
+        ]
+        for z in range(size)
+    ]
+
+
+def test_create_cube_1():
+    assert create_cube(1) == [[[None]]]
+
+
+def test_create_cube_2():
+    assert create_cube(2) == [
+        [
+            [None, None],
+            [None, None],
+        ],
+        [
+            [None, None],
+            [None, None],
+        ],
+    ]
 
 
 def print_cube(cube):
